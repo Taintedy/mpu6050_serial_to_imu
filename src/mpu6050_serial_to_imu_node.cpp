@@ -52,11 +52,11 @@ int main(int argc, char** argv)
   private_node_handle.param<double>("orientation_stddev", orientation_stddev, 0.0);
 
   ros::NodeHandle nh("imu");
-  ros::Publisher imu_pub = nh.advertise<sensor_msgs::Imu>("data", 50);
+  ros::Publisher imu_pub = nh.advertise<sensor_msgs::Imu>("data_raw", 50);
   ros::Publisher imu_temperature_pub = nh.advertise<sensor_msgs::Temperature>("temperature", 50);
   ros::ServiceServer service = nh.advertiseService("set_zero_orientation", set_zero_orientation);
 
-  ros::Rate r(200); // 200 hz
+  ros::Rate r(50); // 200 hz
 
   sensor_msgs::Imu imu;
 
@@ -92,18 +92,18 @@ int main(int argc, char** argv)
         if(ser.available())
         {
           read = ser.read(ser.available());
-          ROS_DEBUG("read %i new characters from serial port, adding to %i characters of old input.", (int)read.size(), (int)input.size());
+          //ROS_DEBUG("read %i new characters from serial port, adding to %i characters of old input.", (int)read.size(), (int)input.size());
           input += read;
-          while (input.length() >= 28) // while there might be a complete package in input
+          while (input.length() >= 14) // while there might be a complete package in input
           {
             //parse for data packets
-            data_packet_start = input.find("$\x03");
+            data_packet_start = input.find("$\x02");
             if (data_packet_start != std::string::npos)
             {
-              ROS_DEBUG("found possible start of data packet at position %d", data_packet_start);
-              if ((input.length() >= data_packet_start + 28) && (input.compare(data_packet_start + 26, 2, "\r\n") == 0))  //check if positions 26,27 exist, then test values
+              //ROS_DEBUG("found possible start of data packet at position %d", data_packet_start);
+              if ((input.length() >= data_packet_start + 14) && (input.compare(data_packet_start + 12, 2, "\r\n") == 0))  //check if positions 26,27 exist, then test values
               {
-                ROS_DEBUG("seems to be a real data package: long enough and found end characters");
+                //ROS_DEBUG("seems to be a real data package: long enough and found end characters");
                 // get quaternion values
                 int16_t w = (((0xff &(char)input[data_packet_start + 2]) << 8) | 0xff &(char)input[data_packet_start + 3]);
                 int16_t x = (((0xff &(char)input[data_packet_start + 4]) << 8) | 0xff &(char)input[data_packet_start + 5]);
@@ -127,36 +127,36 @@ int main(int argc, char** argv)
                 tf::Quaternion differential_rotation;
                 differential_rotation = zero_orientation.inverse() * orientation;
 
-                // get gyro values
-                int16_t gx = (((0xff &(char)input[data_packet_start + 10]) << 8) | 0xff &(char)input[data_packet_start + 11]);
-                int16_t gy = (((0xff &(char)input[data_packet_start + 12]) << 8) | 0xff &(char)input[data_packet_start + 13]);
-                int16_t gz = (((0xff &(char)input[data_packet_start + 14]) << 8) | 0xff &(char)input[data_packet_start + 15]);
-                // calculate rotational velocities in rad/s
-                // without the last factor the velocities were too small
-                // http://www.i2cdevlib.com/forums/topic/106-get-angular-velocity-from-mpu-6050/
-                // FIFO frequency 100 Hz -> factor 10 ?
-                // seems 25 is the right factor
-                //TODO: check / test if rotational velocities are correct
-                double gxf = gx * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
-                double gyf = gy * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
-                double gzf = gz * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
+                // // get gyro values
+                // int16_t gx = (((0xff &(char)input[data_packet_start + 10]) << 8) | 0xff &(char)input[data_packet_start + 11]);
+                // int16_t gy = (((0xff &(char)input[data_packet_start + 12]) << 8) | 0xff &(char)input[data_packet_start + 13]);
+                // int16_t gz = (((0xff &(char)input[data_packet_start + 14]) << 8) | 0xff &(char)input[data_packet_start + 15]);
+                // // calculate rotational velocities in rad/s
+                // // without the last factor the velocities were too small
+                // // http://www.i2cdevlib.com/forums/topic/106-get-angular-velocity-from-mpu-6050/
+                // // FIFO frequency 100 Hz -> factor 10 ?
+                // // seems 25 is the right factor
+                // //TODO: check / test if rotational velocities are correct
+                // double gxf = gx * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
+                // double gyf = gy * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
+                // double gzf = gz * (4000.0/65536.0) * (M_PI/180.0) * 25.0;
 
-                // get acelerometer values
-                int16_t ax = (((0xff &(char)input[data_packet_start + 16]) << 8) | 0xff &(char)input[data_packet_start + 17]);
-                int16_t ay = (((0xff &(char)input[data_packet_start + 18]) << 8) | 0xff &(char)input[data_packet_start + 19]);
-                int16_t az = (((0xff &(char)input[data_packet_start + 20]) << 8) | 0xff &(char)input[data_packet_start + 21]);
-                // calculate accelerations in m/s²
-                double axf = ax * (8.0 / 65536.0) * 9.81;
-                double ayf = ay * (8.0 / 65536.0) * 9.81;
-                double azf = az * (8.0 / 65536.0) * 9.81;
+                // // get acelerometer values
+                // int16_t ax = (((0xff &(char)input[data_packet_start + 16]) << 8) | 0xff &(char)input[data_packet_start + 17]);
+                // int16_t ay = (((0xff &(char)input[data_packet_start + 18]) << 8) | 0xff &(char)input[data_packet_start + 19]);
+                // int16_t az = (((0xff &(char)input[data_packet_start + 20]) << 8) | 0xff &(char)input[data_packet_start + 21]);
+                // // calculate accelerations in m/s²
+                // double axf = ax * (8.0 / 65536.0) * 9.81;
+                // double ayf = ay * (8.0 / 65536.0) * 9.81;
+                // double azf = az * (8.0 / 65536.0) * 9.81;
 
-                // get temperature
-                int16_t temperature = (((0xff &(char)input[data_packet_start + 22]) << 8) | 0xff &(char)input[data_packet_start + 23]);
-                double temperature_in_C = (temperature / 340.0 ) + 36.53;
-                ROS_DEBUG_STREAM("Temperature [in C] " << temperature_in_C);
+                // // get temperature
+                // int16_t temperature = (((0xff &(char)input[data_packet_start + 22]) << 8) | 0xff &(char)input[data_packet_start + 23]);
+                // double temperature_in_C = (temperature / 340.0 ) + 36.53;
+                //ROS_DEBUG_STREAM("Temperature [in C] " << temperature_in_C);
 
-                uint8_t received_message_number = input[data_packet_start + 25];
-                ROS_DEBUG("received message number: %i", received_message_number);
+                uint8_t received_message_number = input[data_packet_start + 11];
+                //ROS_DEBUG("received message number: %i", received_message_number);
 
                 if (received_message) // can only check for continuous numbers if already received at least one packet
                 {
@@ -181,22 +181,22 @@ int main(int argc, char** argv)
 
                 quaternionTFToMsg(differential_rotation, imu.orientation);
 
-                imu.angular_velocity.x = gxf;
-                imu.angular_velocity.y = gyf;
-                imu.angular_velocity.z = gzf;
+                // imu.angular_velocity.x = gxf;
+                // imu.angular_velocity.y = gyf;
+                // imu.angular_velocity.z = gzf;
 
-                imu.linear_acceleration.x = axf;
-                imu.linear_acceleration.y = ayf;
-                imu.linear_acceleration.z = azf;
+                // imu.linear_acceleration.x = axf;
+                // imu.linear_acceleration.y = ayf;
+                // imu.linear_acceleration.z = azf;
 
                 imu_pub.publish(imu);
 
                 // publish temperature message
-                temperature_msg.header.stamp = measurement_time;
-                temperature_msg.header.frame_id = frame_id;
-                temperature_msg.temperature = temperature_in_C;
+                // temperature_msg.header.stamp = measurement_time;
+                // temperature_msg.header.frame_id = frame_id;
+                // temperature_msg.temperature = temperature_in_C;
 
-                imu_temperature_pub.publish(temperature_msg);
+                // imu_temperature_pub.publish(temperature_msg);
 
                 // publish tf transform
                 if (broadcast_tf)
@@ -204,11 +204,11 @@ int main(int argc, char** argv)
                   transform.setRotation(differential_rotation);
                   tf_br.sendTransform(tf::StampedTransform(transform, measurement_time, tf_parent_frame_id, tf_frame_id));
                 }
-                input.erase(0, data_packet_start + 28); // delete everything up to and including the processed packet
+                input.erase(0, data_packet_start + 14); // delete everything up to and including the processed packet
               }
               else
               {
-                if (input.length() >= data_packet_start + 28)
+                if (input.length() >= data_packet_start + 14)
                 {
                   input.erase(0, data_packet_start + 1); // delete up to false data_packet_start character so it is not found again
                 }
