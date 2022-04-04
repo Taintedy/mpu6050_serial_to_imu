@@ -240,7 +240,7 @@ int main(int argc, char** argv)
         }
         catch (serial::IOException& e)
         {
-          ROS_ERROR_STREAM("Unable to open serial port " << ser.getPort() << ". Trying again in 5 seconds.");
+          // ROS_ERROR_STREAM("Unable to open serial port " << ser.getPort() << ". Trying again in 5 seconds.");
           ros::Duration(5).sleep();
         }
 
